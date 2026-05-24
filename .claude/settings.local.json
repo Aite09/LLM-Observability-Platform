@@ -1,7 +1,13 @@
 {
   "permissions": {
     "allow": [
-      "Bash(mkdir -p \\\\ *)"
+      "Bash(mkdir -p \\\\ *)",
+      "Bash(pip install *)",
+      "Bash(python -c \"import sqlalchemy, pydantic, pydantic_settings, fastapi, asyncpg, alembic, pgvector; print\\('all imports OK'\\)\")",
+      "Bash(python3.11 -m venv .venv)",
+      "Bash(python3 -m venv .venv)",
+      "Bash(python3 -)",
+      "Bash(docker compose *)"
     ],
     "additionalDirectories": [
       "/Users/aitezazuddin/LLM-Observability-Platform/api"
