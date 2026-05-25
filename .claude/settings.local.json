@@ -7,7 +7,9 @@
       "Bash(python3.11 -m venv .venv)",
       "Bash(python3 -m venv .venv)",
       "Bash(python3 -)",
-      "Bash(docker compose *)"
+      "Bash(docker compose *)",
+      "Bash(git add *)",
+      "Bash(git commit -m 'Week 2: log ingestion — POST /logs, GET /logs, Redis embedding queue *)"
     ],
     "additionalDirectories": [
       "/Users/aitezazuddin/LLM-Observability-Platform/api"
