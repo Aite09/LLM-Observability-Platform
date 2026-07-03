@@ -1,21 +1,18 @@
 """
-Log worker — async embedding generation via OpenAI, enqueued via RQ.
+Log worker — local embedding generation via fastembed, enqueued via RQ.
 
 Flow:
   POST /logs → create_log() → enqueue_embedding_job(log_id) → RQ queue
   RQ worker picks up → generate_embedding(log_id) → asyncio.run(async fn)
-  → fetch log from DB → OpenAI embeddings.create → UPDATE prompt_embedding
+  → fetch log from DB → fastembed encode (local, $0) → UPDATE prompt_embedding
 
 Why asyncio.run() in generate_embedding?
   RQ calls sync functions. Our DB operations are async (asyncpg).
   asyncio.run() bridges sync → async for each job. Clean, no event loop leaks.
 
-Why text-embedding-3-small?
-  1536 dimensions (same as ada-002), cheaper, faster, matches Vector(1536) column.
-
-Why UPDATE not fetch+modify+commit?
-  Single SQL UPDATE = no re-read, no SQLAlchemy state tracking overhead.
-  Background job just needs to set one column. Efficient.
+Why fastembed?
+  Local ONNX model — no API key, no cost, self-hosted story intact.
+  384 dims must match Vector(384) on LLMLog.prompt_embedding.
 """
 
 from __future__ import annotations
@@ -24,7 +21,6 @@ import asyncio
 import logging
 import uuid
 
-from openai import AsyncOpenAI
 from rq import Queue
 from sqlalchemy import select, update
 
@@ -35,13 +31,7 @@ from workers.base import get_redis_connection
 
 logger = logging.getLogger(__name__)
 
-# Module-level clients — instantiated once per worker process, not per job.
-# get_settings() is lru_cache'd so repeated calls are free.
 _settings = get_settings()
-_openai_client = AsyncOpenAI(api_key=_settings.openai_api_key)
-
-EMBEDDING_MODEL = "text-embedding-3-small"
-EMBEDDING_DIMS = 1536  # must match Vector(1536) in LLMLog model
 
 
 def enqueue_embedding_job(log_id: str) -> None:
@@ -50,42 +40,29 @@ def enqueue_embedding_job(log_id: str) -> None:
 
     Puts a generate_embedding job on the default RQ queue.
     Returns immediately — does not wait for embedding to complete.
-
-    Why sync?
-      FastAPI BackgroundTasks.add_task() calls the function in a thread pool.
-      Keeping this sync avoids event loop nesting issues.
     """
     try:
         q = Queue(connection=get_redis_connection())
         job = q.enqueue(generate_embedding, log_id)
         logger.info("Embedding job enqueued: log_id=%s job_id=%s", log_id, job.id)
     except Exception as exc:  # noqa: BLE001
-        # Redis unavailable → log and continue. Embedding is best-effort.
         logger.error("Failed to enqueue embedding job for log_id=%s: %s", log_id, exc)
 
 
 def generate_embedding(log_id: str) -> None:
-    """
-    Sync RQ job entry point. RQ calls this function in a worker process.
-
-    asyncio.run() creates a new event loop for each job.
-    Safe: RQ worker is single-threaded per job. No loop conflict.
-    """
+    """Sync RQ job entry point — bridges to async implementation."""
     logger.info("Embedding job started: log_id=%s", log_id)
     asyncio.run(_generate_embedding_async(log_id))
 
 
 async def _generate_embedding_async(log_id: str) -> None:
-    """
-    Async implementation:
-      1. Fetch log row from DB
-      2. Call OpenAI embeddings API
-      3. UPDATE prompt_embedding column
-    """
+    """Fetch prompt → embed locally → UPDATE prompt_embedding."""
+    # Import here: loads ONNX model lazily, only in processes that embed.
+    from eval.scorers.embedding_backend import embed_texts
+
     log_uuid = uuid.UUID(log_id)
 
     async with async_session_maker() as session:
-        # 1. Fetch prompt text
         result = await session.execute(
             select(LLMLog.id, LLMLog.prompt).where(LLMLog.id == log_uuid)
         )
@@ -96,19 +73,11 @@ async def _generate_embedding_async(log_id: str) -> None:
 
         _, prompt_text = row
 
-        # 2. Generate embedding
         try:
-            resp = await _openai_client.embeddings.create(
-                model=EMBEDDING_MODEL,
-                input=prompt_text,
-            )
-            embedding: list[float] = resp.data[0].embedding
-            assert len(embedding) == EMBEDDING_DIMS, f"Expected {EMBEDDING_DIMS} dims, got {len(embedding)}"
-        except Exception as exc:
-            logger.error("OpenAI embedding failed for log_id=%s: %s", log_id, exc)
-            return  # leave prompt_embedding as NULL — job is done, no retry storm
-
-        # 3. Persist embedding — single UPDATE, no re-fetch
+            embedding: list[float] = embed_texts([prompt_text])[0].tolist()
+        except Exception as exc:  # noqa: BLE001
+            logger.error("Embedding failed for log_id=%s: %s", log_id, exc)
+            return  # leave NULL — best-effort
         await session.execute(
             update(LLMLog)
             .where(LLMLog.id == log_uuid)

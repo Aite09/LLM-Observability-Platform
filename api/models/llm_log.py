@@ -2,9 +2,10 @@
 LLMLog — one row per LLM API call.
 
 Key design decisions:
-  - prompt_embedding vector(1536): stores the OpenAI text-embedding-3-small
-    embedding of the prompt. Used by the drift detector (pgvector cosine
-    similarity) to compare production query distribution vs baseline.
+  - prompt_embedding vector(384): stores the 384-dim local embedding
+    (fastembed bge-small-en-v1.5) of the prompt. Used by the drift detector
+    (pgvector cosine similarity) to compare production query distribution
+    vs baseline.
   - tags JSONB: arbitrary caller-supplied metadata. JSONB not JSON because
     JSONB is stored binary, indexed, supports containment queries (@>).
   - Composite index on (application_id, created_at): covers the most common
@@ -54,9 +55,9 @@ class LLMLog(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     # Arbitrary caller metadata
     tags: Mapped[dict | None] = mapped_column(JSONB)
 
-    # 1536-dim embedding of the prompt (text-embedding-3-small).
+    # 384-dim local embedding (fastembed bge-small-en-v1.5) of the prompt.
     # NULL until the background worker generates and stores it.
-    prompt_embedding: Mapped[list | None] = mapped_column(Vector(1536))
+    prompt_embedding: Mapped[list | None] = mapped_column(Vector(384))
 
     __table_args__ = (
         # Covers: WHERE application_id = ? AND created_at BETWEEN ? AND ?
