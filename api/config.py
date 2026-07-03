@@ -10,7 +10,7 @@ This means:
 
 from functools import lru_cache
 
-from pydantic import field_validator
+from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -23,8 +23,31 @@ class Settings(BaseSettings):
     # ── Redis ──────────────────────────────────────────────────────────────────
     redis_url: str = "redis://localhost:6379"
 
-    # ── OpenAI ─────────────────────────────────────────────────────────────────
-    openai_api_key: str = ""
+    # ── LLM Judge (eval scorer) ────────────────────────────────────────────────
+    # "mock" = free deterministic heuristic (default — $0 guarantee)
+    # "anthropic" = real Claude judge; requires anthropic_api_key
+    judge_provider: str = "mock"
+    judge_model: str = "claude-haiku-4-5"
+    anthropic_api_key: str = ""
+
+    # ── Embeddings (local, free) ───────────────────────────────────────────────
+    embedding_model: str = "BAAI/bge-small-en-v1.5"  # 384-dim, ONNX via fastembed
+    embedding_dims: int = 384
+
+    # ── Workers ────────────────────────────────────────────────────────────────
+    metrics_interval_seconds: int = 300
+    drift_check_interval_seconds: int = 3600
+
+    # ── Drift detection ────────────────────────────────────────────────────────
+    drift_baseline_days: int = 7
+    drift_min_baseline: int = 50
+    drift_min_current: int = 20
+
+    # ── Webhook signing ────────────────────────────────────────────────────────
+    webhook_secret: str = ""
+
+    # ── OTEL ───────────────────────────────────────────────────────────────────
+    otel_exporter_otlp_endpoint: str = ""
 
     # ── Eval Gate ──────────────────────────────────────────────────────────────
     # CI deploy is blocked if eval pass_rate < this value
@@ -48,6 +71,22 @@ class Settings(BaseSettings):
                 f"Got: {v!r}"
             )
         return v
+
+    @field_validator("judge_provider")
+    @classmethod
+    def judge_provider_known(cls, v: str) -> str:
+        if v not in ("mock", "anthropic"):
+            raise ValueError(f"judge_provider must be 'mock' or 'anthropic', got {v!r}")
+        return v
+
+    @model_validator(mode="after")
+    def anthropic_needs_key(self) -> "Settings":
+        if self.judge_provider == "anthropic" and not self.anthropic_api_key:
+            raise ValueError(
+                "judge_provider=anthropic requires ANTHROPIC_API_KEY. "
+                "Use judge_provider=mock for free operation."
+            )
+        return self
 
     model_config = SettingsConfigDict(
         env_file=".env",
