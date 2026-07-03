@@ -24,14 +24,11 @@ import uuid
 from rq import Queue
 from sqlalchemy import select, update
 
-from api.config import get_settings
 from api.dependencies import async_session_maker
 from api.models.llm_log import LLMLog
 from workers.base import get_redis_connection
 
 logger = logging.getLogger(__name__)
-
-_settings = get_settings()
 
 
 def enqueue_embedding_job(log_id: str) -> None:

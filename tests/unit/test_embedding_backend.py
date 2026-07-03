@@ -1,7 +1,7 @@
 """Embedding backend — lazy singleton around fastembed.
 
 Unit tests use the real model (small, local, free). First call downloads
-~66MB to ~/.cache — CI caches this. If offline, test is skipped.
+~66MB to ~/.cache — CI caches this. Offline first run fails at download.
 """
 
 import numpy as np

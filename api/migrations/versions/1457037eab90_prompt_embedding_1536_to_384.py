@@ -1,5 +1,8 @@
 """prompt_embedding 1536 to 384
 
+Destructive: drop/recreate discards existing 1536-dim embeddings (downgrade
+cannot restore them). Regenerate via the embedding worker after upgrade.
+
 Revision ID: 1457037eab90
 Revises: 8bb1b8aa8a55
 Create Date: 2026-07-03 15:10:03.606559

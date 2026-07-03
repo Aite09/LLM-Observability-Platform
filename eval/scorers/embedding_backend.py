@@ -8,20 +8,23 @@ One lazy singleton per process. Used by:
 
 Why lazy? Model load reads ~66MB from disk (first run: downloads).
 Workers that never embed (metrics_worker) shouldn't pay that cost.
-No FastAPI imports — this module is part of the standalone eval package.
+
+Config: reads EMBEDDING_MODEL from the environment directly — no api.config
+import, so eval/ stays standalone and embedding never requires DATABASE_URL.
 """
 
 from __future__ import annotations
 
 import logging
+import os
 import threading
 
 import numpy as np
 from fastembed import TextEmbedding
 
-from api.config import get_settings
-
 logger = logging.getLogger(__name__)
+
+DEFAULT_EMBEDDING_MODEL = "BAAI/bge-small-en-v1.5"
 
 _model: TextEmbedding | None = None
 _lock = threading.Lock()
@@ -33,9 +36,9 @@ def _get_model() -> TextEmbedding:
     if _model is None:
         with _lock:
             if _model is None:
-                settings = get_settings()
-                logger.info("Loading embedding model %s", settings.embedding_model)
-                _model = TextEmbedding(model_name=settings.embedding_model)
+                model_name = os.environ.get("EMBEDDING_MODEL", DEFAULT_EMBEDDING_MODEL)
+                logger.info("Loading embedding model %s", model_name)
+                _model = TextEmbedding(model_name=model_name)
     return _model
 
 
@@ -44,6 +47,8 @@ def embed_texts(texts: list[str]) -> np.ndarray:
 
     fastembed returns a generator of arrays; stack once for vector math.
     """
+    if not texts:
+        raise ValueError("texts must be non-empty")
     model = _get_model()
     return np.stack(list(model.embed(texts)))
 
