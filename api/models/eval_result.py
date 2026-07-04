@@ -8,12 +8,17 @@ Stores all three scorer outputs for every test case so you can:
 """
 
 import uuid
+from typing import TYPE_CHECKING
 
 from sqlalchemy import Boolean, ForeignKey, Numeric, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from api.models.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
+
+if TYPE_CHECKING:
+    from api.models.eval_run import EvalRun
+    from api.models.test_case import TestCase
 
 
 class EvalResult(Base, UUIDPrimaryKeyMixin, TimestampMixin):

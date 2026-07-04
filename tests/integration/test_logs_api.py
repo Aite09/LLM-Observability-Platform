@@ -1,6 +1,5 @@
 """Integration tests for /logs API (needs running postgres via docker compose)."""
 
-import pytest
 from httpx import AsyncClient
 
 

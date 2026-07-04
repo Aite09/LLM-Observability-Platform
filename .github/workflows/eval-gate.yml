@@ -1,0 +1,69 @@
+name: Eval Gate
+
+on:
+  pull_request:
+
+jobs:
+  eval-gate:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg15
+        env:
+          POSTGRES_USER: llm_obs
+          POSTGRES_PASSWORD: llm_obs_password
+          POSTGRES_DB: llm_obs
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U llm_obs" --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgresql+asyncpg://llm_obs:llm_obs_password@localhost:5432/llm_obs
+      JUDGE_PROVIDER: mock        # $0 — deterministic judge in CI
+      EVAL_GATE_THRESHOLD: "0.8"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Cache fastembed model
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/fastembed
+          key: fastembed-bge-small-en-v1.5
+      - run: pip install -e .
+      - run: alembic upgrade head
+      - name: Seed eval suite
+        run: |
+          python - <<'EOF'
+          import asyncio
+          from api.dependencies import async_session_maker, engine
+          from api.models.test_case import TestCase
+
+          PROMPTS = [
+              "How do I reset my password?",
+              "What is the refund policy?",
+              "How do I export my data?",
+              "Where do I find my API keys?",
+              "How do I add a team member?",
+          ]
+
+          async def main() -> None:
+              async with async_session_maker() as s:
+                  s.add_all([
+                      TestCase(
+                          suite_name="core",
+                          input_prompt=p,
+                          expected_output=f"Expected answer for: {p}",
+                          eval_methods=["exact_match", "embedding_similarity"],
+                          similarity_threshold=0.8,
+                      ) for p in PROMPTS
+                  ])
+                  await s.commit()
+              await engine.dispose()
+
+          asyncio.run(main())
+          EOF
+      - name: Run eval gate
+        run: python -m eval.runner --suite core --commit-sha "$GITHUB_SHA" --triggered-by github_actions
