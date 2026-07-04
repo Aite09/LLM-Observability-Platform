@@ -31,6 +31,13 @@ async def list_metrics(
     page: int,
     page_size: int,
 ) -> tuple[list[Metric], int]:
+    # period_start is TIMESTAMP WITHOUT TIME ZONE (naive-UTC); asyncpg rejects
+    # comparing it to a tz-aware value, so normalize before it hits the query.
+    if start is not None and start.tzinfo is not None:
+        start = start.astimezone(timezone.utc).replace(tzinfo=None)
+    if end is not None and end.tzinfo is not None:
+        end = end.astimezone(timezone.utc).replace(tzinfo=None)
+
     query = select(Metric)
     if application_id is not None:
         query = query.where(Metric.application_id == application_id)

@@ -87,11 +87,19 @@ async def list_logs(
       `status` is a Python builtin — using it as a parameter name shadows it.
       FastAPI still exposes the query param as `?status=...` via alias.
     """
-    from datetime import datetime
+    from datetime import datetime, timezone
 
-    # Parse datetime strings (Query params are strings; Pydantic handles if passed as model)
-    parsed_start = datetime.fromisoformat(start_time) if start_time else None
-    parsed_end = datetime.fromisoformat(end_time) if end_time else None
+    # Parse datetime strings (Query params are strings; Pydantic handles if passed as model).
+    # created_at is TIMESTAMP WITHOUT TIME ZONE (naive-UTC); normalize tz-aware
+    # input (e.g. a trailing "Z"/"+00:00") so asyncpg doesn't reject the comparison.
+    def _parse_naive_utc(raw: str | None) -> datetime | None:
+        if raw is None:
+            return None
+        parsed = datetime.fromisoformat(raw)
+        return parsed.astimezone(timezone.utc).replace(tzinfo=None) if parsed.tzinfo else parsed
+
+    parsed_start = _parse_naive_utc(start_time)
+    parsed_end = _parse_naive_utc(end_time)
 
     filters = LLMLogFilter(
         application_id=application_id,
