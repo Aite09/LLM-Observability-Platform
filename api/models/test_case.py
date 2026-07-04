@@ -24,6 +24,9 @@ from api.models.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
 class TestCase(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     __tablename__ = "test_cases"
 
+    # Not a pytest test class — the name collides with pytest's collection heuristic.
+    __test__ = False
+
     # Groups test cases into named suites (e.g. "production-v1", "summarization")
     suite_name: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
 
