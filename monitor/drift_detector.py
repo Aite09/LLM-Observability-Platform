@@ -136,5 +136,10 @@ async def detect_drift_for_app(session: AsyncSession, application_id: str) -> Dr
     session.add(alert)
     await session.commit()
     await session.refresh(alert)
+
+    from api.observability import drift_alerts_total
+
+    drift_alerts_total.labels(application_id, severity).inc()
+
     logger.warning("drift[%s]: %s alert, score=%.4f", application_id, severity, score)
     return alert

@@ -44,6 +44,13 @@ async def create_log(session: AsyncSession, data: LLMLogCreate) -> LLMLog:
     session.add(log)
     await session.commit()
     await session.refresh(log)
+
+    from api.observability import llm_cost_usd_total, llm_logs_ingested_total
+
+    llm_logs_ingested_total.labels(log.application_id, log.model, log.status).inc()
+    if log.cost_usd is not None:
+        llm_cost_usd_total.labels(log.application_id, log.model).inc(float(log.cost_usd))
+
     logger.info("Log created: id=%s application=%s model=%s status=%s", log.id, log.application_id, log.model, log.status)
     return log
 

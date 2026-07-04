@@ -118,6 +118,11 @@ async def run_eval(
 
     await session.commit()
     await session.refresh(run)
+
+    from api.observability import eval_runs_total
+
+    eval_runs_total.labels(suite_name, run.gate_result).inc()
+
     logger.info(
         "Eval run %s: suite=%s %d/%d passed rate=%.4f gate=%s",
         run.id, suite_name, passed_count, len(cases), run.pass_rate, run.gate_result,

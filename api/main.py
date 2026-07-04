@@ -65,6 +65,24 @@ def create_app() -> FastAPI:
     app.include_router(metrics.router)
     app.include_router(drift.router)
 
+    # Prometheus: /prometheus-metrics (not /metrics — that's the rollup API).
+    # instrument() re-registers on every create_app() (tests call it repeatedly);
+    # a duplicate default-metrics registration raises ValueError — swallow it,
+    # the collectors are process-global and already registered.
+    from prometheus_fastapi_instrumentator import Instrumentator
+
+    try:
+        Instrumentator(excluded_handlers=["/prometheus-metrics", "/health"]).instrument(app).expose(
+            app, endpoint="/prometheus-metrics", include_in_schema=False
+        )
+    except ValueError:
+        logger.debug("Prometheus instrumentator already registered — reusing collectors")
+
+    # OpenTelemetry tracing — no-op unless OTEL_EXPORTER_OTLP_ENDPOINT is set.
+    from api.tracing import setup_tracing
+
+    setup_tracing(app)
+
     return app
 
 
