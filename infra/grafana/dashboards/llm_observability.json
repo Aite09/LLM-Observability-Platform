@@ -1,0 +1,40 @@
+{
+  "title": "LLM Observability — API",
+  "uid": "llm-obs-api",
+  "timezone": "browser",
+  "refresh": "30s",
+  "time": { "from": "now-6h", "to": "now" },
+  "panels": [
+    {
+      "id": 1, "type": "timeseries", "title": "Request rate (req/s)",
+      "gridPos": { "x": 0, "y": 0, "w": 12, "h": 8 },
+      "targets": [{ "expr": "sum(rate(http_requests_total{handler!~\"/prometheus-metrics|/health\"}[5m]))" }]
+    },
+    {
+      "id": 2, "type": "timeseries", "title": "API p95 latency (s)",
+      "gridPos": { "x": 12, "y": 0, "w": 12, "h": 8 },
+      "targets": [{ "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le))" }]
+    },
+    {
+      "id": 3, "type": "timeseries", "title": "Logs ingested /min by status",
+      "gridPos": { "x": 0, "y": 8, "w": 12, "h": 8 },
+      "targets": [{ "expr": "sum(rate(llm_logs_ingested_total[5m])) by (status) * 60" }]
+    },
+    {
+      "id": 4, "type": "timeseries", "title": "Logged LLM spend rate (USD/h)",
+      "gridPos": { "x": 12, "y": 8, "w": 12, "h": 8 },
+      "targets": [{ "expr": "sum(rate(llm_cost_usd_total[1h])) by (model) * 3600" }]
+    },
+    {
+      "id": 5, "type": "stat", "title": "Eval gate results (24h)",
+      "gridPos": { "x": 0, "y": 16, "w": 12, "h": 6 },
+      "targets": [{ "expr": "sum(increase(eval_runs_total[24h])) by (gate_result)" }]
+    },
+    {
+      "id": 6, "type": "stat", "title": "Drift alerts (24h) by severity",
+      "gridPos": { "x": 12, "y": 16, "w": 12, "h": 6 },
+      "targets": [{ "expr": "sum(increase(drift_alerts_total[24h])) by (severity)" }]
+    }
+  ],
+  "schemaVersion": 39
+}
