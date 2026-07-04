@@ -5,6 +5,7 @@ from datetime import datetime, timedelta, timezone
 
 import numpy as np
 import pytest
+from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -75,3 +76,42 @@ class TestDetector:
         session.add(_embedded_log(app, _now() - timedelta(days=3), [0.1] * 384))
         await session.commit()
         assert await detect_drift_for_app(session, app) is None
+
+
+class TestDriftAPI:
+    async def _make_alert(self, session: AsyncSession, app: str = "app-d") -> DriftAlert:
+        alert = DriftAlert(
+            application_id=app, drift_type="embedding_distribution", severity="high",
+            drift_score=0.41, baseline_stats={}, current_stats={}, detected_at=_now(),
+        )
+        session.add(alert)
+        await session.commit()
+        await session.refresh(alert)
+        return alert
+
+    async def test_list_filters_by_status(self, client: AsyncClient, session: AsyncSession) -> None:
+        await self._make_alert(session)
+        resp = await client.get("/drift/alerts", params={"status": "open"})
+        assert resp.status_code == 200
+        assert resp.json()["total"] == 1
+
+    async def test_acknowledge_then_resolve(self, client: AsyncClient, session: AsyncSession) -> None:
+        alert = await self._make_alert(session)
+
+        ack = await client.patch(f"/drift/alerts/{alert.id}", json={"status": "acknowledged"})
+        assert ack.status_code == 200
+        assert ack.json()["status"] == "acknowledged"
+        assert ack.json()["resolved_at"] is None
+
+        res = await client.patch(f"/drift/alerts/{alert.id}", json={"status": "resolved"})
+        assert res.status_code == 200
+        assert res.json()["resolved_at"] is not None
+
+    async def test_patch_unknown_404(self, client: AsyncClient) -> None:
+        resp = await client.patch(f"/drift/alerts/{uuid.uuid4()}", json={"status": "resolved"})
+        assert resp.status_code == 404
+
+    async def test_patch_invalid_status_422(self, client: AsyncClient, session: AsyncSession) -> None:
+        alert = await self._make_alert(session)
+        resp = await client.patch(f"/drift/alerts/{alert.id}", json={"status": "closed"})
+        assert resp.status_code == 422
