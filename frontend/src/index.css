@@ -1,0 +1,43 @@
+@import "@fontsource/jersey-25";
+@import "@fontsource/ibm-plex-sans/400.css";
+@import "@fontsource/ibm-plex-sans/500.css";
+@import "@fontsource/ibm-plex-sans/600.css";
+@import "@fontsource/ibm-plex-mono/400.css";
+@import "@fontsource/ibm-plex-mono/500.css";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* Linen Terminal — spec tokens (OKLCH) */
+  --bg: oklch(0.955 0.015 78);
+  --surface: oklch(0.925 0.018 76);
+  --raise: oklch(0.885 0.022 74);
+  --hairline: oklch(0.855 0.02 75);
+  --rule: oklch(0.815 0.022 73);
+  --ink: oklch(0.36 0.06 48);
+  --ink-2: oklch(0.48 0.048 56);
+  --faint: oklch(0.6 0.04 62);
+  --accent: oklch(0.6 0.125 42);
+  --accent-soft: oklch(0.6 0.125 42 / 0.12);
+  --sage: oklch(0.52 0.085 135);
+  --rust: oklch(0.55 0.15 30);
+  --font-display: "Jersey 25", "IBM Plex Sans", sans-serif;
+  --font-ui: "IBM Plex Sans", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+}
+
+html { background: var(--bg); color: var(--ink); font-family: var(--font-ui); }
+
+/* Focus visibility — AA keyboard nav */
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
+
+/* Number columns align on tabular figures */
+.tnum { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+
+/* Chart draw-in — states a data refresh, honors reduced motion */
+@media (prefers-reduced-motion: no-preference) {
+  .fade-up { animation: fadeUp 240ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+  @keyframes fadeUp { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+}
