@@ -19,7 +19,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from api.config import get_settings
-from api.routers import health, logs
+from api.routers import evals, health, logs
 
 logger = logging.getLogger(__name__)
 
@@ -60,7 +60,8 @@ def create_app() -> FastAPI:
     # Register routers
     app.include_router(health.router)
     app.include_router(logs.router)
-    # Week 3+: app.include_router(evals.router)
+    app.include_router(evals.test_cases_router)
+    app.include_router(evals.evals_router)
     # Week 4+: app.include_router(metrics.router)
     # Week 5+: app.include_router(drift.router)
 
