@@ -45,3 +45,9 @@ htmlcov/
 # Docker
 *.log
 .superpowers/
+
+# Local AI-assistant tooling (machine-specific, not part of the project)
+.claude/
+.github/skills/
+.github/hooks/
+graphify-out/
