@@ -38,7 +38,7 @@ jobs:
         with:
           path: ~/.cache/fastembed
           key: fastembed-bge-small-en-v1.5
-      - run: pip install -e ".[dev]" ruff
+      - run: pip install -e ".[dev]" ruff==0.17.3
       - run: ruff check .
       - run: pytest tests/unit -v
       - run: pytest tests/integration -v
