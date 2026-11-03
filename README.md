@@ -213,6 +213,25 @@ scorers and threshold apply unchanged.
 
 ---
 
+## Real traffic: Research Agent
+
+The demo seed is synthetic, but the platform is also wired to a real LLM app.
+[Research Agent](https://github.com/Aite09/research-agent) (a LangGraph pipeline on
+Groq Llama 3.3 70B) routes every Planner/Writer/Critic call through one wrapper that
+posts to `POST /logs` with tokens, list-price cost, latency, status and an `agent` tag:
+
+```bash
+# this repo
+docker compose up -d && alembic upgrade head
+# research-agent repo (its API runs on :8001, so both can run at once)
+OBSERVABILITY_URL=http://localhost:8000 python -m benchmarks.run --runs 10
+```
+
+Prompts are sent without the constant system prompt, so the 512-token embedding
+used for drift reflects what users actually asked about.
+
+---
+
 ## Design system — "Linen Terminal"
 
 The dashboard deliberately avoids the generic dark-mode-SaaS look. It's a warm
@@ -268,6 +287,8 @@ battle-testing. Specifically:
 
 - The seed data is synthetic (fabricated prompts/costs/latencies), generated to
   exercise every code path realistically — it is not real production traffic.
+  Live traffic comes from Research Agent (above) — a portfolio app, not a
+  production service.
 - Demo scale is ~3,000 log rows; the percentile/drift math is real, but it hasn't
   been load-tested at the volume a high-traffic production deployment would see.
 - No auth/multi-tenancy layer — every endpoint is open, by design, for a
